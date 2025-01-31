@@ -653,9 +653,19 @@ function renderVersionHistory(table) {
     container.appendChild(versionItem);
   });
 
-  // ▼▼▼▼▼▼▼ 关键修改：将事件绑定逻辑移至外部 ▼▼▼▼▼▼▼
-  // 这里不再直接绑定事件，而是通过 jQuery 在外部处理
-  return container.outerHTML; // 返回 HTML 字符串
+  $(container).on('click', '.restore-btn', function() {
+    const tableIndex = $(this).data('table-index');
+    const versionId = $(this).data('version-id');
+    const targetTable = waitingTable.find(t => t.tableIndex === tableIndex);
+    
+    if (targetTable) {
+      targetTable.restoreVersion(versionId).then(() => {
+        toastr.success(`表格[${targetTable.tableName}]已恢复至版本${versionId}`);
+      });
+    }
+  });
+
+  return container;
 }
 
 function executeTableEditFunction(functionList) {
