@@ -27,3 +27,25 @@
     border-radius: 6px;
     display:none;
 }
+
+.version-history-panel {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 1em;
+  border-top: 1px solid #444;
+  padding: 10px;
+}
+
+.version-item {
+  background: #2a2a2a;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.restore-btn {
+  background: #4CAF50;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+}
