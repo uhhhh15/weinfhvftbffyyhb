@@ -629,59 +629,43 @@ function updateRow(tableIndex, rowIndex, data) {
     modifyTable(tableIndex, (table) => table.update(rowIndex, data));
 }
 
-function handleTableEditTag(matches) {
-    let functionList = []
-    matches.forEach(match => {
-        const functionStr = trimString(match)
-        const newFunctionList = functionStr.split('\n').map(str => str.trim()).filter(str => str !== '')
-        functionList = functionList.concat(newFunctionList)
-    })
-    return functionList
-}
-
-function isTableEditStrChanged(chat, matches) {
-    if (chat.tableEditMatches != null && chat.tableEditMatches.join('') === matches.join('')) {
-        return false
-    }
-    chat.tableEditMatches = matches
-    return true
-}
-
-let currentPage = 0;
-const PAGE_SIZE = 10; // 每页显示10个版本
-
 function renderVersionHistory(table) {
-    const container = document.createElement('div');
-    container.classList.add('version-history');
-    container.dataset.tableIndex = table.tableIndex;
+  // 创建版本历史容器
+  const container = document.createElement('div');
+  container.classList.add('version-history');
+  container.dataset.tableIndex = table.tableIndex;
 
-    // 只渲染当前页的版本，避免一次性加载过多数据导致性能问题
-    const startIndex = currentPage * PAGE_SIZE;
-    const endIndex = startIndex + PAGE_SIZE;
-    const versionsToRender = table.versions.slice(startIndex, endIndex);
+  // 渲染版本条目
+  table.versions.forEach(version => {
+    const versionItem = document.createElement('div');
+    versionItem.classList.add('version-item');
+    versionItem.innerHTML = `
+      <p>版本号: ${version.versionId}</p>
+      <p>操作类型: ${version.operationType}</p>
+      <p>操作时间: ${version.timestamp}</p>
+      <p>操作者: ${version.operator}</p>
+      <button class="restore-btn" 
+              data-version-id="${version.versionId}"
+              data-table-index="${table.tableIndex}">
+        恢复此版本
+      </button>
+    `;
+    container.appendChild(versionItem);
+  });
 
-    versionsToRender.forEach(version => {
-        const versionItem = document.createElement('div');
-        versionItem.classList.add('version-item');
-        versionItem.innerHTML = `
-            <p>版本号: ${version.versionId}</p>
-            <p>操作类型: ${version.operationType}</p>
-            <p>操作时间: ${version.timestamp}</p>
-            <p>操作者: ${version.operator}</p>
-            <button class="restore-btn" data-version-id="${version.versionId}">恢复</button>
-        `;
-        container.appendChild(versionItem);
-    });
+  $(container).on('click', '.restore-btn', function() {
+    const tableIndex = $(this).data('table-index');
+    const versionId = $(this).data('version-id');
+    const targetTable = waitingTable.find(t => t.tableIndex === tableIndex);
+    
+    if (targetTable) {
+      targetTable.restoreVersion(versionId).then(() => {
+        toastr.success(`表格[${targetTable.tableName}]已恢复至版本${versionId}`);
+      });
+    }
+  });
 
-    // 滚动加载更多版本
-    container.addEventListener('scroll', () => {
-        if (container.scrollTop + container.clientHeight >= container.scrollHeight) {
-            currentPage++;
-            renderVersionHistory(table);
-        }
-    });
-
-    return container;
+  return container;
 }
 
 function executeTableEditFunction(functionList) {
@@ -933,9 +917,27 @@ jQuery(async () => {
         extension_settings.muyoo_dataTable.deep = value;
         saveSettingsDebounced();
     })
-    $("#open_table").on('click', () => openTablePopup());
+    $("#open_table").on('click', () => openTablePopup());       
     $("#reset_settings").on('click', () => resetSettings());
     $("#table_update_button").on('click', updateTablePlugin);
+    
+    $("#show_version_history").on('click', async () => {
+  try {
+    const tables = findLastestTableData(); // 获取最新表格数据
+    const versionContainer = document.getElementById('versionHistoryContainer');
+    versionContainer.innerHTML = ''; // 清空旧内容
+    
+    // 为每个表格渲染版本历史
+    tables.forEach(table => {
+      const historyHtml = renderVersionHistory(table);
+      versionContainer.appendChild(historyHtml);
+    });
+    toastr.success("历史版本已加载");
+  } catch (e) {
+    toastr.error("加载失败：" + e.message);
+  }
+});   
+    
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPromptReady);
