@@ -653,19 +653,9 @@ function renderVersionHistory(table) {
     container.appendChild(versionItem);
   });
 
-  $(container).on('click', '.restore-btn', function() {
-    const tableIndex = $(this).data('table-index');
-    const versionId = $(this).data('version-id');
-    const targetTable = waitingTable.find(t => t.tableIndex === tableIndex);
-    
-    if (targetTable) {
-      targetTable.restoreVersion(versionId).then(() => {
-        toastr.success(`表格[${targetTable.tableName}]已恢复至版本${versionId}`);
-      });
-    }
-  });
-
-  return container;
+  // ▼▼▼▼▼▼▼ 关键修改：将事件绑定逻辑移至外部 ▼▼▼▼▼▼▼
+  // 这里不再直接绑定事件，而是通过 jQuery 在外部处理
+  return container.outerHTML; // 返回 HTML 字符串
 }
 
 function executeTableEditFunction(functionList) {
@@ -877,14 +867,17 @@ async function updateTablePlugin() {
 
 jQuery(async () => {
     fetch("http://api.muyoo.com.cn/check-version", {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientVersion: '1.0.2' })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientVersion: '1.0.2' })
     }).then(res => res.json()).then(res => {
         if (res.success) {
-            if (!res.isLatest) $("#tableUpdateTag").show()
-            if (res.toastr) toastr.warning(res.toastrText)
-            if (res.message) $("#table_message_tip").text(res.message)
+            if (!res.isLatest) $("#tableUpdateTag").show();
+            if (res.toastr) toastr.warning(res.toastrText);
+            if (res.message) $("#table_message_tip").text(res.message);
         }
-    })
+    });
+
     const html = await renderExtensionTemplateAsync('third-party/st-memory-enhancement', 'index');
     const buttonHtml = await renderExtensionTemplateAsync('third-party/st-memory-enhancement', 'buttons');
     const button = `
@@ -894,6 +887,7 @@ jQuery(async () => {
     $('#data_bank_wand_container').append(buttonHtml);
     $('.extraMesButtons').append(button);
     $('#translation_container').append(html);
+
     $(document).on('pointerup', '.open_table_by_id', function () {
         try {
             const messageId = $(this).closest('.mes').attr('mesid');
@@ -902,42 +896,52 @@ jQuery(async () => {
             console.error('Failed to copy: ', err);
         }
     });
+
     loadSettings();
+
     $('#dataTable_injection_mode').on('change', (event) => {
         extension_settings.muyoo_dataTable.injection_mode = event.target.value;
         saveSettingsDebounced();
     });
+
     $('#dataTable_message_template').on("input", function () {
         const value = $(this).val();
         extension_settings.muyoo_dataTable.message_template = value;
         saveSettingsDebounced();
-    })
+    });
+
     $('#dataTable_deep').on("input", function () {
         const value = $(this).val();
         extension_settings.muyoo_dataTable.deep = value;
         saveSettingsDebounced();
-    })
-    $("#open_table").on('click', () => openTablePopup());       
+    });
+
+    $("#open_table").on('click', () => openTablePopup());
     $("#reset_settings").on('click', () => resetSettings());
     $("#table_update_button").on('click', updateTablePlugin);
-    
+
+    // ▼▼▼▼▼▼▼ 修改后的 #show_version_history 点击事件处理 ▼▼▼▼▼▼▼
     $("#show_version_history").on('click', async () => {
-  try {
-    const tables = findLastestTableData(); // 获取最新表格数据
-    const versionContainer = document.getElementById('versionHistoryContainer');
-    versionContainer.innerHTML = ''; // 清空旧内容
-    
-    // 为每个表格渲染版本历史
-    tables.forEach(table => {
-      const historyHtml = renderVersionHistory(table);
-      versionContainer.appendChild(historyHtml);
+        try {
+            const tables = findLastestTableData(); // 获取最新表格数据
+            // ▼▼▼▼▼▼▼ 关键修改：使用 jQuery 选择器定位容器 ▼▼▼▼▼▼▼
+            const $versionContainer = $('#versionHistoryContainer');
+            $versionContainer.empty(); // 清空旧内容
+
+            // 为每个表格渲染版本历史
+            tables.forEach(table => {
+                const historyHtml = renderVersionHistory(table);
+                // ▼▼▼▼▼▼▼ 使用 jQuery 的 append 方法 ▼▼▼▼▼▼▼
+                $versionContainer.append(historyHtml);
+            });
+
+            toastr.success("历史版本已加载");
+        } catch (e) {
+            toastr.error("加载失败：" + e.message);
+            console.error(e); // 输出详细错误到控制台
+        }
     });
-    toastr.success("历史版本已加载");
-  } catch (e) {
-    toastr.error("加载失败：" + e.message);
-  }
-});   
-    
+
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
     eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPromptReady);
